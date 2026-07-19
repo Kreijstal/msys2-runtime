@@ -584,9 +584,15 @@ get_cygwin_startup_info ()
 void
 child_info_fork::handle_fork ()
 {
+#ifdef __aarch64__
+  parent = OpenProcess (PROCESS_VM_READ, FALSE, parent_winpid);
+  if (!parent)
+    api_fatal ("unable to reopen fork parent %u, %E", parent_winpid);
+#endif
   cygheap_fixup_in_child (false);
   memory_init ();
   myself.thisproc (NULL);
+  myself.preserve ();
   myself->uid = cygheap->user.real_uid;
   myself->gid = cygheap->user.real_gid;
 
@@ -594,6 +600,10 @@ child_info_fork::handle_fork ()
 	      "dll data", dll_data_start, dll_data_end,
 	      "dll bss", dll_bss_start, dll_bss_end,
 	      "user heap", cygheap->user_heap.base, cygheap->user_heap.ptr,
+#ifdef __aarch64__
+	      "ARM64 bootstrap heap", (void *) 0x10000000,
+	      (void *) 0x10010000,
+#endif
 	      NULL);
 
   /* If my_wr_proc_pipe != NULL then it's a leftover handle from a previously
@@ -641,11 +651,18 @@ child_info_spawn::handle_spawn ()
 {
   extern void fixup_lockf_after_exec (bool);
   HANDLE h = INVALID_HANDLE_VALUE;
+#ifdef __aarch64__
+  if (!get_parent_handle ())
+    api_fatal ("unable to reopen spawn parent %u, %E", parent_winpid);
+  cygheap_fixup_in_child (true);
+  memory_init ();
+#else
   if (!dynamically_loaded || get_parent_handle ())
       {
 	cygheap_fixup_in_child (true);
 	memory_init ();
       }
+#endif
 
   cygheap->pid = cygpid;
 

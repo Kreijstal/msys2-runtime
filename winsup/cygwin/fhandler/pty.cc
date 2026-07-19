@@ -3475,6 +3475,7 @@ fhandler_pty_slave::setup_pseudoconsole ()
   get_ttyp ()->switch_to_nat_pipe = true;
 
   HANDLE hpConIn, hpConOut;
+  HPCON hpcon = NULL;
   if (get_ttyp ()->pcon_activated)
     { /* The pseudo console is already activated. */
       if (GetStdHandle (STD_INPUT_HANDLE) == get_handle ())
@@ -3515,8 +3516,6 @@ fhandler_pty_slave::setup_pseudoconsole ()
   PROCESS_INFORMATION pi;
   HANDLE hello, goodbye;
   HANDLE hr, hw;
-  HPCON hpcon;
-
   do
     { /* Create new pseudo console */
       COORD size = {

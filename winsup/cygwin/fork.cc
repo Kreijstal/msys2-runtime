@@ -338,6 +338,12 @@ frok::parent (volatile char * volatile stack_here)
   ch.refresh_cygheap ();
   ch.prefork ();	/* set up process tracking pipes. */
 
+#ifdef __aarch64__
+  /* ARM64 forkees reopen the parent instead of relying on an inherited
+     process handle, which is not stable across CreateProcess. */
+  ch.parent_winpid = GetCurrentProcessId ();
+#endif
+
   *with_forkables = dlls.setup_forkables (*with_forkables);
 
   ch.silentfail (!*with_forkables); /* fail silently without forkables */

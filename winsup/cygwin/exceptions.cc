@@ -1111,7 +1111,7 @@ out:
   return interrupted;
 }
 
-static inline bool
+static inline bool __attribute__ ((unused))
 has_visible_window_station ()
 {
   HWINSTA station_hdl;
