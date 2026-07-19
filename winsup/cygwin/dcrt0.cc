@@ -69,7 +69,6 @@ do_global_ctors (void (**in_pfunc)(), int force)
 
   /* Run ctors backwards, so skip the first entry and find how many
      there are, then run them. */
-
   void (**pfunc) () = in_pfunc;
 
   while (*++pfunc)
@@ -584,9 +583,19 @@ get_cygwin_startup_info ()
 void
 child_info_fork::handle_fork ()
 {
+#ifdef __aarch64__
+  parent = OpenProcess (PROCESS_VM_READ, FALSE, parent_winpid);
+  if (!parent)
+    api_fatal ("unable to reopen fork parent %u, %E", parent_winpid);
+#endif
   cygheap_fixup_in_child (false);
   memory_init ();
   myself.thisproc (NULL);
+#ifdef __aarch64__
+  /* thisproc creates the replacement ARM64 process mapping.  Keep the
+     process-global pinfo wrapper from releasing it during teardown. */
+  myself.preserve ();
+#endif
   myself->uid = cygheap->user.real_uid;
   myself->gid = cygheap->user.real_gid;
 
@@ -641,11 +650,18 @@ child_info_spawn::handle_spawn ()
 {
   extern void fixup_lockf_after_exec (bool);
   HANDLE h = INVALID_HANDLE_VALUE;
+#ifdef __aarch64__
+  if (!get_parent_handle ())
+    api_fatal ("unable to reopen spawn parent %u, %E", parent_winpid);
+  cygheap_fixup_in_child (true);
+  memory_init ();
+#else
   if (!dynamically_loaded || get_parent_handle ())
       {
 	cygheap_fixup_in_child (true);
 	memory_init ();
       }
+#endif
 
   cygheap->pid = cygpid;
 
@@ -1051,6 +1067,13 @@ _dll_crt0 ()
 		       movq  %%rsp, %%rbp  \n\
 		       subq  $32,%%rsp     \n"
 		       : : [ADDR] "r" (stackaddr));
+#elif defined (__aarch64__)
+	      /* Windows ARM64 keeps SP 16-byte aligned.  Establish a fresh
+	         frame record on the relocated stack before making calls. */
+	      __asm__ volatile ("mov sp, %[ADDR]\n\t"
+				"mov x29, sp\n\t"
+				"sub sp, sp, #32"
+				: : [ADDR] "r" (stackaddr) : "memory");
 #else
 #error unimplemented for this target
 #endif

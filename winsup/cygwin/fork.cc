@@ -95,7 +95,15 @@ bool
 frok::error (const char *fmt, ...)
 {
   DWORD exit_code = ch.exit_code;
-  if (!exit_code && hchild)
+#if defined (__aarch64__)
+  /* ARM64 QEMU child-start faults arrive as a child exit code; proc_retry
+     recognizes the transient cases before the child can synchronize. */
+#endif
+  if (hchild
+#if !defined (__aarch64__)
+      && !exit_code
+#endif
+      )
     {
       exit_code = ch.proc_retry (hchild);
       if (!exit_code)
@@ -337,6 +345,12 @@ frok::parent (volatile char * volatile stack_here)
   fix_impersonation = true;
   ch.refresh_cygheap ();
   ch.prefork ();	/* set up process tracking pipes. */
+
+#ifdef __aarch64__
+  /* ARM64 forkees reopen the parent instead of relying on an inherited
+     process handle, which is not stable across CreateProcess. */
+  ch.parent_winpid = GetCurrentProcessId ();
+#endif
 
   *with_forkables = dlls.setup_forkables (*with_forkables);
 
@@ -667,6 +681,8 @@ dofork (void **proc, bool *with_forkables)
     volatile char * volatile stackp;
 #ifdef __x86_64__
     __asm__ volatile ("movq %%rsp,%0": "=r" (stackp));
+#elif defined (__aarch64__)
+    __asm__ volatile ("mov %0, sp" : "=r" (stackp));
 #else
 #error unimplemented for this target
 #endif

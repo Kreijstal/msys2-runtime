@@ -618,9 +618,9 @@ sigwait_common (const sigset_t *set, siginfo_t *info, PLARGE_INTEGER waittime)
       sig_dispatch_pending (true);
 
 do_wait:
-      switch (cygwait (NULL, waittime,
-		       cw_sig_eintr | cw_cancel | cw_cancel_self))
-	{
+	  switch (cygwait (NULL, waittime,
+			   cw_sig_eintr | cw_cancel | cw_cancel_self))
+	    {
 	case WAIT_SIGNALED:
 	  if (!sigismember (set, _my_tls.infodata.si_signo))
 	    set_errno (EINTR);
@@ -659,7 +659,7 @@ do_wait:
 	default:
 	  __seterrno ();
 	  break;
-	}
+	    }
     }
   __except (EFAULT)
     {
